@@ -392,10 +392,13 @@ func (g *Game) Leave(p *player.Player) (bool, error) {
 	worldChanged := false
 	if !g.State().Waiting() {
 		h := p.Tx().RemoveEntity(p)
-		DefaultWaitingWorld.Exec(func(newTx *world.Tx) {
+		<-DefaultWaitingWorld.Exec(func(newTx *world.Tx) {
 			newP := newTx.AddEntity(h).(*player.Player)
 			newP.Teleport(DefaultWaitingWorld.Spawn().Vec3Middle())
 			for e := range newTx.Players() {
+				if e.H() == newP.H() {
+					continue
+				}
 				e.(*player.Player).HideEntity(newP)
 				newP.HideEntity(e)
 			}
@@ -550,7 +553,6 @@ func (g *Game) Start(tx *world.Tx) {
 
 	g.Players(tx, func(p *player.Player, _ *Participant) {
 		resetPlayer(p)
-		p.SetImmobile()
 
 		pH := tx.RemoveEntity(p)
 		h = append(h, pH)
@@ -558,7 +560,7 @@ func (g *Game) Start(tx *world.Tx) {
 
 	g.setState(StatePlaying)
 
-	<-g.w.Exec(func(newTx *world.Tx) {
+	g.w.Exec(func(newTx *world.Tx) {
 		for _, pH := range h {
 			newTx.AddEntity(pH)
 		}
@@ -656,13 +658,13 @@ func (g *Game) playAgain(p *player.Player) {
 	}
 
 	if worldChanged {
-		DefaultWaitingWorld.Exec(func(tx *world.Tx) {
-			p, ok := p.H().Entity(tx)
+		<-DefaultWaitingWorld.Exec(func(tx *world.Tx) {
+			newP, ok := p.H().Entity(tx)
 			if !ok {
 				return
 			}
 
-			(g.playAgainHook)(p.(*player.Player))
+			(g.playAgainHook)(newP.(*player.Player))
 		})
 		return
 	}

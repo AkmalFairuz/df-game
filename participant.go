@@ -53,13 +53,12 @@ func (par *Participant) Closed() bool {
 
 // close closes the participant.
 func (par *Participant) close() {
-	if par.Closed() {
+	if par.closed.CompareAndSwap(false, true) {
 		return
 	}
 	_ = par.impl.Close()
 	par.impl = nil
 	par.h = nil
-	par.closed.Store(true)
 }
 
 // Name returns the name of the participant.
